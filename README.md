@@ -48,7 +48,7 @@ Use the toggle switch in the top right corner to switch between light and dark m
 
 ## Support
 If you encounter any issues or have suggestions for improvements, 
-feel free to open an issue on the [GitHub repository](https://github.com/AdrianMiller99/tfg-anvil-calculator).
+feel free to open an issue on the [GitHub repository](https://github.com/AdrianMiller99/tfg-anvil-calculator/issues/new/choose).
 
 If you feel like this tool has helped you and you want to support me, 
 you can do so by buying me a coffee on [Ko-fi](https://ko-fi.com/adrianmiller99) or by simply giving the repository a star.
