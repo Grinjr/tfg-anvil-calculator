@@ -234,6 +234,11 @@ button:hover {
   margin-bottom: 20px;
 }
 
+.instruction-set select {
+  text-align: center;
+  text-align-last: center;
+}
+
 /* Spacing between the section title and instructions */
 #instructions-section h2 {
   width: 100%;
