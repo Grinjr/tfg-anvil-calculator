@@ -307,13 +307,13 @@ function setupInstructionListener(selector) {
   applyTooltipToIcon(icon);
 }
 
-// Function to reset all inputs and selections
 function resetPage() {
   // Reset target value input
   document.getElementById('target-value').value = '';
 
   // Reset instruction sets
-  document.querySelectorAll('.instruction-set').forEach(set => {
+  const defaults = ['last', 'second-last', 'third-last'];
+  document.querySelectorAll('.instruction-set').forEach((set, index) => {
     const actionIcon = set.querySelector('.action-icon');
     actionIcon.src = '../res/empty.png';
     actionIcon.setAttribute('data-action', '');
@@ -321,7 +321,7 @@ function resetPage() {
 
     const prioritySelect = set.querySelector('.priority');
     if (prioritySelect) {
-      prioritySelect.selectedIndex = 0;
+      prioritySelect.value = defaults[index] || '';
     }
   });
 
