@@ -220,24 +220,25 @@ button:hover {
 /* Horizontal layout for instruction sets */
 #instructions {
   display: flex;
-  flex-direction: row;      /* horizontal layout */
-  gap: 20px;                /* spacing between instruction sets */
-  align-items: flex-start;  /* align icons and dropdowns */
-  flex-wrap: wrap;          /* wrap to next line if screen too small */
+  flex-direction: row;
+  justify-content: center;
+  gap: 20px;
+  align-items: flex-start;
+  flex-wrap: wrap;
 }
 
 .instruction-set {
   display: flex;
-  flex-direction: column;   /* icon above dropdown */
+  flex-direction: column;
   align-items: center;
   margin-bottom: 20px;
 }
 
-/* Optional: spacing between the section title and instructions */
+/* Spacing between the section title and instructions */
 #instructions-section h2 {
   width: 100%;
   margin-bottom: 10px;
-  text-align: left;   /* or center if preferred */
+  text-align: left;
 }
 
 /* Adjusting image size within the instruction section */
