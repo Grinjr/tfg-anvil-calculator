@@ -10,8 +10,12 @@ document.addEventListener('DOMContentLoaded', function() {
     icon.setAttribute('data-action', '');
   });
 
-  document.querySelectorAll('.priority').forEach(select => {
-    select.selectedIndex = 0;
+  const defaults = ['last', 'second-last', 'third-last'];
+  document.querySelectorAll('.instruction-set').forEach((set, index) => {
+    const select = set.querySelector('.priority');
+    if (select) {
+      select.value = defaults[index] || '';
+    }
   });
 
   document.getElementById('target-value').value = '';
