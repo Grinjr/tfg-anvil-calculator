@@ -217,6 +217,22 @@ button:hover {
   color: inherit;
 }
 
+/* Horizontal layout for instruction sets */
+#instructions {
+  display: flex;
+  flex-direction: row;      /* horizontal layout */
+  gap: 20px;                /* spacing between instruction sets */
+  align-items: flex-start;  /* align icons and dropdowns */
+  flex-wrap: wrap;          /* wrap to next line if screen too small */
+}
+
+.instruction-set {
+  display: flex;
+  flex-direction: column;   /* icon above dropdown */
+  align-items: center;
+  margin-bottom: 20px;
+}
+
 /* Adjusting image size within the instruction section */
 .instruction-set .action-icon {
   width: 64px;
@@ -235,16 +251,6 @@ select {
   font-size: 14px;
   border-radius: 4px;
   border: 1px solid inherit;
-}
-
-.instruction-set {
-  margin-bottom: 20px;
-  display: flex;
-  align-items: center;
-}
-
-.instruction-set img {
-  margin-right: 10px;
 }
 
 .action-icon {
@@ -388,6 +394,11 @@ input:checked + .slider:before {
     position: static;
     transform: none;
     margin: 10px 0;
+  }
+
+  #instructions {
+    flex-direction: column;  /* stack vertically on mobile */
+    align-items: center;
   }
 }
 
