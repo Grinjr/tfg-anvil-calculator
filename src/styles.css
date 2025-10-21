@@ -233,6 +233,13 @@ button:hover {
   margin-bottom: 20px;
 }
 
+/* Optional: spacing between the section title and instructions */
+#instructions-section h2 {
+  width: 100%;
+  margin-bottom: 10px;
+  text-align: left;   /* or center if preferred */
+}
+
 /* Adjusting image size within the instruction section */
 .instruction-set .action-icon {
   width: 64px;
