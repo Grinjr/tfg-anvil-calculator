@@ -209,10 +209,29 @@ document.getElementById("calculate-button").addEventListener("click", function()
   setupContainer.innerHTML = "";
   finalContainer.innerHTML = "";
 
-  // Append setup actions as images
+  // Group and append setup actions
+  const groupedSetup = {};
   setupActions.forEach(action => {
-    setupContainer.appendChild(createActionImage(action));
+    groupedSetup[action] = (groupedSetup[action] || 0) + 1;
   });
+  
+  Object.entries(groupedSetup).forEach(([action, count]) => {
+    const wrapper = document.createElement("div");
+    wrapper.classList.add("action-with-count");
+  
+    const img = createActionImage(action);
+    wrapper.appendChild(img);
+  
+    if (count > 1) {
+      const countText = document.createElement("div");
+      countText.classList.add("action-count");
+      countText.textContent = `×${count}`;
+      wrapper.appendChild(countText);
+    }
+  
+    setupContainer.appendChild(wrapper);
+  });
+
 
   // Append final instructions as images
   sortedInstructions.forEach(instr => {
