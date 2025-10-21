@@ -125,6 +125,34 @@ document.getElementById("calculate-button").addEventListener("click", function()
     return bestHitAction;
   }
 
+  function displayGroupedActions(container, actions) {
+    // Group identical actions
+    const grouped = actions.reduce((acc, action) => {
+      const key = typeof action === "string" ? action : action.action;
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+  
+    // Render grouped actions
+    Object.entries(grouped).forEach(([action, count]) => {
+      const wrapper = document.createElement("div");
+      wrapper.classList.add("action-with-count");
+  
+      const img = createActionImage(action);
+      wrapper.appendChild(img);
+  
+      if (count > 1) {
+        const countText = document.createElement("div");
+        countText.classList.add("action-count");
+        countText.textContent = `×${count}`;
+        wrapper.appendChild(countText);
+      }
+  
+      container.appendChild(wrapper);
+    });
+  }
+
+
   function calculateSetupActions(targetValue, instructions) {
     let instructionSum = 0;
     instructions.forEach(instr => {
@@ -210,33 +238,10 @@ document.getElementById("calculate-button").addEventListener("click", function()
   finalContainer.innerHTML = "";
 
   // Group and append setup actions
-  const groupedSetup = {};
-  setupActions.forEach(action => {
-    groupedSetup[action] = (groupedSetup[action] || 0) + 1;
-  });
-  
-  Object.entries(groupedSetup).forEach(([action, count]) => {
-    const wrapper = document.createElement("div");
-    wrapper.classList.add("action-with-count");
-  
-    const img = createActionImage(action);
-    wrapper.appendChild(img);
-  
-    if (count > 1) {
-      const countText = document.createElement("div");
-      countText.classList.add("action-count");
-      countText.textContent = `×${count}`;
-      wrapper.appendChild(countText);
-    }
-  
-    setupContainer.appendChild(wrapper);
-  });
+  displayGroupedActions(setupContainer, setupActions);
 
-
-  // Append final instructions as images
-  sortedInstructions.forEach(instr => {
-    finalContainer.appendChild(createActionImage(instr.action));
-  });
+  // Group and append final instructions
+  displayGroupedActions(finalContainer, sortedInstructions);
 
   // Show the result card with a transition
   const resultCard = document.getElementById("result");
