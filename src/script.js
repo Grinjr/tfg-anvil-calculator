@@ -172,37 +172,26 @@ document.getElementById("calculate-button").addEventListener("click", function()
     let preTargetValue = targetValue - instructionSum;
     if (preTargetValue === 0) return [];
   
-    const queue = [[0, []]];
+    const queue = [[0, []]]; // [currentValue, actionsPath]
     const visited = new Set([0]);
-    const maxSearch = Math.max(Math.abs(preTargetValue) * 3, 100);
-    const maxIterations = 50000;
-    let iterations = 0;
   
-    while (queue.length > 0 && iterations < maxIterations) {
-      iterations++;
+    while (queue.length > 0) {
       const [currentValue, path] = queue.shift();
   
-      if (currentValue === preTargetValue) {
-        return path;
-      }
+      if (currentValue === preTargetValue) return path;
   
       for (let action in actions) {
         const nextValue = currentValue + actions[action];
   
-        // Allow exploration slightly beyond target (overshoot)
-        if (
-          !visited.has(nextValue) &&
-          Math.abs(nextValue) <= maxSearch &&
-          Math.abs(nextValue - preTargetValue) <= maxSearch
-        ) {
+        if (!visited.has(nextValue)) {
           visited.add(nextValue);
           queue.push([nextValue, [...path, action]]);
         }
       }
     }
   
-    // If no valid path found, return null to handle gracefully
-    return null;
+    // If BFS fails (should never happen), return empty array instead of null
+    return [];
   }
 
   function sortInstructions(instructions) {
