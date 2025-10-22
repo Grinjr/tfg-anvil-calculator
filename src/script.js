@@ -176,54 +176,75 @@ document.getElementById("calculate-button").addEventListener("click", function()
       return [];
     }
     
-    // For negative values, we need to use negative actions (hits)
-    // For positive values, we need to use positive actions (punch, bend, etc.)
-    // Create a DP table that works with both positive and negative indices
-    
-    const offset = 10000; // Offset to handle negative indices
-    const maxRange = 20000; // Total range
-    const dp = new Map(); // Use Map for sparse storage
-    const parent = new Map(); // Track the path
-    
-    dp.set(0, 0); // distance from 0 to 0 is 0
-    
-    const queue = [0];
-    let front = 0;
-    
-    while (front < queue.length) {
-      const current = queue[front++];
-      const currentDist = dp.get(current);
-      
-      if (current === preTargetValue) {
-        // Reconstruct path
-        const path = [];
-        let node = preTargetValue;
-        while (node !== 0) {
-          const [prevNode, action] = parent.get(node);
-          path.push(action);
-          node = prevNode;
-        }
-        return path.reverse();
-      }
-      
-      // Try all actions
-      for (let action in actions) {
-        const nextValue = current + actions[action];
-        
-        // Bound check: don't go too far from our target
-        const maxBound = Math.max(Math.abs(preTargetValue), 100) + 50;
-        if (Math.abs(nextValue) > maxBound) continue;
-        
-        if (!dp.has(nextValue)) {
-          dp.set(nextValue, currentDist + 1);
-          parent.set(nextValue, [current, action]);
-          queue.push(nextValue);
+    // Determine if we need positive or negative actions
+    if (preTargetValue > 0) {
+      // Use standard DP for positive values
+      const dp = Array(preTargetValue + 1).fill(Infinity);
+      dp[0] = 0;
+  
+      for (let i = 0; i <= preTargetValue; i++) {
+        if (dp[i] !== Infinity) {
+          for (let action in actions) {
+            let nextValue = i + actions[action];
+            if (nextValue >= 0 && nextValue <= preTargetValue) {
+              dp[nextValue] = Math.min(dp[nextValue], dp[i] + 1);
+            }
+          }
         }
       }
+  
+      let setupActions = [];
+      let currentValue = preTargetValue;
+  
+      while (currentValue > 0) {
+        for (let action in actions) {
+          let prevValue = currentValue - actions[action];
+          if (prevValue >= 0 && dp[prevValue] === dp[currentValue] - 1) {
+            setupActions.push(action);
+            currentValue = prevValue;
+            break;
+          }
+        }
+      }
+  
+      setupActions.reverse();
+      return setupActions;
+    } else {
+      // For negative values, use DP with offset
+      const absTarget = Math.abs(preTargetValue);
+      const maxRange = absTarget + 50; // Small buffer
+      const offset = maxRange;
+      const dp = Array(2 * maxRange + 1).fill(Infinity);
+      dp[offset] = 0; // 0 is at position offset
+  
+      for (let i = 0; i < dp.length; i++) {
+        if (dp[i] !== Infinity) {
+          for (let action in actions) {
+            let nextIndex = i + actions[action];
+            if (nextIndex >= 0 && nextIndex < dp.length) {
+              dp[nextIndex] = Math.min(dp[nextIndex], dp[i] + 1);
+            }
+          }
+        }
+      }
+  
+      let setupActions = [];
+      let currentIndex = offset + preTargetValue;
+  
+      while (currentIndex !== offset) {
+        for (let action in actions) {
+          let prevIndex = currentIndex - actions[action];
+          if (prevIndex >= 0 && prevIndex < dp.length && dp[prevIndex] === dp[currentIndex] - 1) {
+            setupActions.push(action);
+            currentIndex = prevIndex;
+            break;
+          }
+        }
+      }
+  
+      setupActions.reverse();
+      return setupActions;
     }
-    
-    // Fallback: should not reach here if solution exists
-    return [];
   }
 
   function sortInstructions(instructions) {
