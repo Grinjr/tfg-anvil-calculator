@@ -170,43 +170,39 @@ document.getElementById("calculate-button").addEventListener("click", function()
     });
   
     let preTargetValue = targetValue - instructionSum;
-    
-    // Handle zero case
-    if (preTargetValue === 0) {
-      return [];
-    }
-    
-    // Use BFS to find optimal path for both positive and negative values
-    const queue = [[0, []]]; // [currentValue, actionsPath]
+    if (preTargetValue === 0) return [];
+  
+    const queue = [[0, []]];
     const visited = new Set([0]);
-    
-    while (queue.length > 0) {
+    const maxSearch = Math.max(Math.abs(preTargetValue) * 3, 100);
+    const maxIterations = 50000;
+    let iterations = 0;
+  
+    while (queue.length > 0 && iterations < maxIterations) {
+      iterations++;
       const [currentValue, path] = queue.shift();
-      
-      // Check if we've reached the target
+  
       if (currentValue === preTargetValue) {
         return path;
       }
-      
-      // Try all possible actions
+  
       for (let action in actions) {
         const nextValue = currentValue + actions[action];
-        
-        // Bound the search space to prevent infinite loops
-        const maxSearch = Math.max(Math.abs(preTargetValue) * 2, 100);
+  
+        // Allow exploration slightly beyond target (overshoot)
         if (
           !visited.has(nextValue) &&
-          Math.abs(nextValue - preTargetValue) <= maxSearch && // stay near the target
-          Math.abs(nextValue) <= maxSearch                     // stay near zero
+          Math.abs(nextValue) <= maxSearch &&
+          Math.abs(nextValue - preTargetValue) <= maxSearch
         ) {
           visited.add(nextValue);
           queue.push([nextValue, [...path, action]]);
         }
       }
     }
-    
-    // Fallback: should not reach here if solution exists
-    return [];
+  
+    // If no valid path found, return null to handle gracefully
+    return null;
   }
 
   function sortInstructions(instructions) {
