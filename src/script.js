@@ -113,6 +113,104 @@ document.getElementById("calculate-button").addEventListener("click", function()
     draw: -15
   };
 
+  function expandHitPlaceholders(instructions) {
+    // Convert instructions with "hit" action into all possible combinations of hit1/hit2/hit3
+    const hitOptions = ['hit1', 'hit2', 'hit3'];
+    const sequences = [[]];
+    
+    for (const instr of instructions) {
+      if (instr.action === 'hit') {
+        // Expand all current sequences with each hit option
+        const newSequences = [];
+        for (const seq of sequences) {
+          for (const hitType of hitOptions) {
+            newSequences.push([...seq, hitType]);
+          }
+        }
+        sequences.length = 0;
+        sequences.push(...newSequences);
+      } else {
+        // Just add this action to all sequences
+        for (const seq of sequences) {
+          seq.push(instr.action);
+        }
+      }
+    }
+    
+    return sequences;
+  }
+  
+  function findShortestPath(targetValue) {
+    // Reference the existing actions object from the outer scope
+    if (targetValue === 0) {
+      return [];
+    }
+    
+    // BFS to find shortest path from 0 to targetValue
+    const queue = [[0, []]]; // [currentValue, path]
+    const visited = new Set([0]);
+    const maxSteps = 25;
+    
+    while (queue.length > 0) {
+      const [currentValue, path] = queue.shift();
+      
+      // Don't search too deep
+      if (path.length >= maxSteps) {
+        continue;
+      }
+      
+      // Found it!
+      if (currentValue === targetValue) {
+        return path;
+      }
+      
+      // Try all possible actions
+      for (const [action, value] of Object.entries(actions)) {
+        const nextValue = currentValue + value;
+        
+        // Bounds check: don't explore too far from target
+        const bound = Math.max(Math.abs(targetValue) + 30, 100);
+        if (Math.abs(nextValue) > bound) {
+          continue;
+        }
+        
+        if (!visited.has(nextValue)) {
+          visited.add(nextValue);
+          queue.push([nextValue, [...path, action]]);
+        }
+      }
+    }
+    
+    return null; // No solution found
+  }
+  
+  function calculateOptimalPath(targetValue, instructions) {
+    // Sort instructions by priority
+    const sortedInstructions = sortInstructions(instructions);
+    
+    // Try all possible combinations of hits for "hit" placeholders
+    const possibleFinalSequences = expandHitPlaceholders(sortedInstructions);
+    
+    let bestSolution = null;
+    let minSetupActions = Infinity;
+    
+    // For each possible final sequence, calculate what setup is needed
+    for (const finalSeq of possibleFinalSequences) {
+      const finalSum = finalSeq.reduce((sum, action) => sum + actions[action], 0);
+      const preTargetValue = targetValue - finalSum;
+      
+      // Find shortest path to preTargetValue using BFS
+      const setupActions = findShortestPath(preTargetValue);
+      
+      if (setupActions !== null && setupActions.length < minSetupActions) {
+        minSetupActions = setupActions.length;
+        bestSolution = { setupActions, finalSequence: finalSeq };
+      }
+    }
+    
+    return bestSolution;
+  }
+
   function selectBestHit(preTargetValue, remainingHits) {
     let bestHitAction = null;
     let minActions = Infinity;
@@ -158,74 +256,19 @@ document.getElementById("calculate-button").addEventListener("click", function()
 
 
   function calculateSetupActions(targetValue, instructions) {
-    let instructionSum = 0;
-    instructions.forEach(instr => {
-      if (instr.action === "hit") {
-        const bestHit = selectBestHit(targetValue - instructionSum, ["hit1", "hit2", "hit3"]);
-        instructionSum += actions[bestHit];
-        instr.action = bestHit;
-      } else {
-        instructionSum += actions[instr.action];
-      }
-    });
-  
-    let preTargetValue = targetValue - instructionSum;
+    const result = calculateOptimalPath(targetValue, instructions);
     
-    // Handle zero case
-    if (preTargetValue === 0) {
-      return [];
+    if (!result) {
+      return { setupActions: [], finalSequence: [] };
     }
     
-    // Use Map-based DP that works for both positive and negative targets
-    const dp = new Map();
-    const parent = new Map();
-    dp.set(0, 0);
+    // Convert finalSequence back to instruction objects for display
+    const finalInstructions = result.finalSequence.map(action => ({ action }));
     
-    // Use level-by-level BFS with reasonable limits
-    let currentLevel = [0];
-    let visited = new Set([0]);
-    const maxSteps = 30; // Maximum number of actions to try
-    
-    // Calculate reasonable bounds for exploration
-    const minBound = Math.min(preTargetValue - 50, -50);
-    const maxBound = Math.max(preTargetValue + 50, 50);
-    
-    for (let step = 0; step < maxSteps; step++) {
-      const nextLevel = [];
-      
-      for (const current of currentLevel) {
-        if (current === preTargetValue) {
-          // Found it! Reconstruct path
-          const path = [];
-          let node = preTargetValue;
-          while (node !== 0) {
-            const [prevNode, action] = parent.get(node);
-            path.push(action);
-            node = prevNode;
-          }
-          return path.reverse();
-        }
-        
-        // Try all actions
-        for (let action in actions) {
-          const nextValue = current + actions[action];
-          
-          // Only explore values within reasonable range
-          if (nextValue >= minBound && nextValue <= maxBound && !visited.has(nextValue)) {
-            visited.add(nextValue);
-            dp.set(nextValue, step + 1);
-            parent.set(nextValue, [current, action]);
-            nextLevel.push(nextValue);
-          }
-        }
-      }
-      
-      currentLevel = nextLevel;
-      if (currentLevel.length === 0) break;
-    }
-    
-    // Fallback if not found
-    return [];
+    return {
+      setupActions: result.setupActions,
+      finalSequence: finalInstructions
+    };
   }
 
   function sortInstructions(instructions) {
@@ -234,25 +277,18 @@ document.getElementById("calculate-button").addEventListener("click", function()
     const thirdLast = instructions.filter(i => i.priority === 'third-last');
     const notLast = instructions.filter(i => i.priority === 'not-last');
     const anyPriority = instructions.filter(i => i.priority === 'any');
-
-    let sortedInstructions = [...thirdLast, ...secondLast, ...notLast, ...last];
-
+    
+    // Build the sequence: [thirdLast, secondLast, notLast/any, last]
+    let sorted = [...thirdLast, ...secondLast, ...notLast];
+    
+    // Insert "any" priority items before "last" items
     if (anyPriority.length > 0) {
-      const anyHits = anyPriority.map(i => i);
-
-      let insertionPoint = 0;
-      if (last.length > 0 && secondLast.length > 0) {
-        insertionPoint = sortedInstructions.length - last.length - secondLast.length;
-      } else if (last.length > 0) {
-        insertionPoint = sortedInstructions.length - last.length;
-      } else {
-        insertionPoint = sortedInstructions.length;
-      }
-
-      sortedInstructions.splice(insertionPoint, 0, ...anyHits);
+      const insertPoint = sorted.length;
+      sorted.splice(insertPoint, 0, ...anyPriority);
     }
-
-    return sortedInstructions;
+    
+    sorted.push(...last);
+    return sorted;
   }
 
   const setupActions = calculateSetupActions(targetValue, instructions);
