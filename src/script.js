@@ -279,66 +279,39 @@ document.getElementById("calculate-button").addEventListener("click", function()
   }
   
   function sortInstructions(instructions) {
-    const last = instructions.filter(i => i.priority === "last");
-    const secondLast = instructions.filter(i => i.priority === "second-last");
-    const thirdLast = instructions.filter(i => i.priority === "third-last");
+    const last = instructions.find(i => i.priority === "last");
+    const secondLast = instructions.find(i => i.priority === "second-last");
+    const thirdLast = instructions.find(i => i.priority === "third-last");
+  
     const notLast = instructions.filter(i => i.priority === "not-last");
     const anyPriority = instructions.filter(i => i.priority === "any");
   
-    // Build final slots
-    const finalSlots = [...thirdLast, ...secondLast, ...last];
+    // Build base sequence (flexible instructions first)
+    let combined = [...anyPriority, ...notLast];
   
-    // Start with flexible instructions
-    let combined = [...anyPriority, ...notLast, ...finalSlots];
+    // Now add fixed slots in strict order
+    const finals = [];
+    if (thirdLast) finals.push(thirdLast);
+    if (secondLast) finals.push(secondLast);
+    if (last) finals.push(last);
   
-    // Guarantee: every instruction is included
-    const seen = new Set(combined.map(i => JSON.stringify(i)));
-    instructions.forEach(i => {
-      const key = JSON.stringify(i);
-      if (!seen.has(key)) {
-        combined.splice(combined.length - finalSlots.length, 0, i);
-        seen.add(key);
-      }
-    });
+    combined = [...combined, ...finals];
   
-    // Enforce "not-last" constraint strictly
-    const lastIndex = combined.length - 1;
-    if (combined[lastIndex] && combined[lastIndex].priority === "not-last") {
-      // try to swap with earlier non-not-last
-      let swapIndex = -1;
-      for (let i = lastIndex - 1; i >= 0; i--) {
-        if (combined[i].priority !== "not-last") {
-          swapIndex = i;
-          break;
-        }
-      }
-      if (swapIndex !== -1) {
-        const tmp = combined[swapIndex];
-        combined[swapIndex] = combined[lastIndex];
-        combined[lastIndex] = tmp;
-      } else {
-        throw new Error("Constraint violation: all instructions are 'not-last', cannot place one at end.");
-      }
-    }
+    // --- Validation ---
+    const len = combined.length;
+    if (len === 0) throw new Error("Empty instruction sequence!");
   
-    // Validation
-    function validate(seq) {
-      const len = seq.length;
-      if (len === 0) throw new Error("Empty instruction sequence!");
-    
-      seq.forEach((instr, idx) => {
-        if (instr.priority === "last" && idx !== len - 1)
-          throw new Error("Constraint violation: 'last' not in last position");
-        if (instr.priority === "second-last" && len >= 2 && idx !== len - 2)
-          throw new Error("Constraint violation: 'second-last' not in second-last position");
-        if (instr.priority === "third-last" && len >= 3 && idx !== len - 3)
-          throw new Error("Constraint violation: 'third-last' not in third-last position");
-        if (instr.priority === "not-last" && idx === len - 1)
-          throw new Error("Constraint violation: 'not-last' placed last");
-      });
-    }
+    if (last && combined[len - 1] !== last)
+      throw new Error("Constraint violation: 'last' not in last position");
   
-    validate(combined);
+    if (secondLast && combined[len - 2] !== secondLast)
+      throw new Error("Constraint violation: 'second-last' not in second-last position");
+  
+    if (thirdLast && combined[len - 3] !== thirdLast)
+      throw new Error("Constraint violation: 'third-last' not in third-last position");
+  
+    if (combined[len - 1]?.priority === "not-last")
+      throw new Error("Constraint violation: 'not-last' placed last");
   
     return combined;
   }
