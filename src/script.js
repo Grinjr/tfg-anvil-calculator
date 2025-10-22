@@ -158,14 +158,14 @@ document.getElementById("calculate-button").addEventListener("click", function()
 
 
   function calculateSetupActions(targetValue, instructions) {
-    // First, apply the instructions that already have actions
+    // First, resolve "hit" placeholders
     let instructionSum = 0;
     instructions.forEach(instr => {
       if (instr.action === "hit") {
-        // Pick best hit for the current remaining target
-        const bestHit = selectBestHit(targetValue - instructionSum, ["hit1", "hit2", "hit3"]);
-        instructionSum += actions[bestHit];
-        instr.action = bestHit;
+        const remaining = targetValue - instructionSum;
+        const bestHit = selectBestHit(remaining, ["hit1", "hit2", "hit3"]);
+        instr.action = bestHit || "hit1";
+        instructionSum += actions[instr.action];
       } else {
         instructionSum += actions[instr.action];
       }
@@ -174,86 +174,155 @@ document.getElementById("calculate-button").addEventListener("click", function()
     let preTargetValue = targetValue - instructionSum;
     if (preTargetValue === 0) return [];
   
-    const isNegativeTarget = preTargetValue < 0;
+    const isNegative = preTargetValue < 0;
   
-    // --- BFS First ---
-    const queue = [[0, []]]; // [currentValue, path]
-    const visited = new Map(); // value => shortest path length
+    // --- BFS exact search ---
+    const MAX_BFS_STEPS = 18;
+    const queue = [[0, []]];
+    const visited = new Map();
     visited.set(0, 0);
-    const MAX_BFS_STEPS = 15;
   
-    while (queue.length > 0) {
-      const [currentValue, path] = queue.shift();
+    while (queue.length) {
+      const [cur, path] = queue.shift();
+      if (cur === preTargetValue) return path;
   
-      if (currentValue === preTargetValue) return path;
       if (path.length >= MAX_BFS_STEPS) continue;
   
-      const sortedActions = Object.entries(actions)
-        .sort(([, value]) => Math.abs(preTargetValue - (currentValue + value)));
+      const candidates = Object.entries(actions)
+        .map(([a, v]) => ({ action: a, value: v, score: Math.abs(preTargetValue - (cur + v)) }))
+        .sort((x, y) => x.score - y.score);
   
-      for (let [action, value] of sortedActions) {
-        const nextValue = currentValue + value;
-  
-        // Skip actions that move the wrong direction
-        if ((isNegativeTarget && nextValue > preTargetValue) || (!isNegativeTarget && nextValue < preTargetValue)) {
-          continue;
-        }
-  
-        if (!visited.has(nextValue) || visited.get(nextValue) > path.length + 1) {
-          visited.set(nextValue, path.length + 1);
-          queue.push([nextValue, [...path, action]]);
+      for (let { action, value } of candidates) {
+        const next = cur + value;
+        if (!visited.has(next) || visited.get(next) > path.length + 1) {
+          visited.set(next, path.length + 1);
+          queue.push([next, [...path, action]]);
         }
       }
     }
   
-    // --- BFS failed, fallback to greedy ---
+    // --- Greedy heuristic ---
+    const MAX_GREEDY_STEPS = 60;
     let greedyValue = 0;
     const greedyPath = [];
-    const MAX_GREEDY_STEPS = 20;
   
     for (let i = 0; i < MAX_GREEDY_STEPS && greedyValue !== preTargetValue; i++) {
       let bestAction = null;
-      let bestDistance = Math.abs(preTargetValue - greedyValue);
+      let bestDist = Math.abs(preTargetValue - greedyValue);
   
-      for (let action in actions) {
-        const nextValue = greedyValue + actions[action];
-        const distance = Math.abs(preTargetValue - nextValue);
-  
-        // Skip moves that push the wrong way
-        if ((isNegativeTarget && nextValue > preTargetValue) || (!isNegativeTarget && nextValue < preTargetValue)) {
-          continue;
-        }
-  
-        if (distance < bestDistance) {
-          bestDistance = distance;
-          bestAction = action;
+      for (let a in actions) {
+        const next = greedyValue + actions[a];
+        const dist = Math.abs(preTargetValue - next);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestAction = a;
         }
       }
   
-      if (!bestAction) break; // no improvement possible
-  
-      greedyValue += actions[bestAction];
+      if (!bestAction) break;
       greedyPath.push(bestAction);
+      greedyValue += actions[bestAction];
     }
   
-    return greedyPath;
+    if (greedyValue === preTargetValue && greedyPath.length > 0) {
+      return greedyPath;
+    }
+  
+    // --- Constructive fallback (always produces something) ---
+    const constructed = [];
+    let curVal = 0;
+  
+    const actionList = Object.keys(actions).sort((a, b) => Math.abs(actions[b]) - Math.abs(actions[a]));
+    let attempts = 0;
+  
+    while (curVal !== preTargetValue && attempts < 100) {
+      let bestAction = null;
+      let bestDist = Math.abs(preTargetValue - curVal);
+      for (let a of actionList) {
+        const next = curVal + actions[a];
+        const dist = Math.abs(preTargetValue - next);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestAction = a;
+        }
+      }
+      if (!bestAction) break;
+      constructed.push(bestAction);
+      curVal += actions[bestAction];
+      attempts++;
+    }
+  
+    if (constructed.length === 0) {
+      // fallback safety
+      constructed.push("punch");
+    }
+  
+    return constructed;
   }
   
   function sortInstructions(instructions) {
-    const last = instructions.filter(i => i.priority === 'last');
-    const secondLast = instructions.filter(i => i.priority === 'second-last');
-    const thirdLast = instructions.filter(i => i.priority === 'third-last');
-    const notLast = instructions.filter(i => i.priority === 'not-last');
-    const anyPriority = instructions.filter(i => i.priority === 'any');
+    const last = instructions.filter(i => i.priority === "last");
+    const secondLast = instructions.filter(i => i.priority === "second-last");
+    const thirdLast = instructions.filter(i => i.priority === "third-last");
+    const notLast = instructions.filter(i => i.priority === "not-last");
+    const anyPriority = instructions.filter(i => i.priority === "any");
   
-    // Final steps are fixed positions at the end
-    const finalInstructions = [...thirdLast, ...secondLast, ...last];
+    // Build final slots
+    const finalSlots = [...thirdLast, ...secondLast, ...last];
   
-    // Any and not-last can appear before the final sequence (setup steps)
-    const setupInstructions = [...anyPriority, ...notLast];
+    // Start with flexible instructions
+    let combined = [...anyPriority, ...notLast, ...finalSlots];
   
-    // Combine setup first, final at the end
-    return [...setupInstructions, ...finalInstructions];
+    // Guarantee: every instruction is included
+    const seen = new Set(combined.map(i => JSON.stringify(i)));
+    instructions.forEach(i => {
+      const key = JSON.stringify(i);
+      if (!seen.has(key)) {
+        combined.splice(combined.length - finalSlots.length, 0, i);
+        seen.add(key);
+      }
+    });
+  
+    // Enforce "not-last" constraint strictly
+    const lastIndex = combined.length - 1;
+    if (combined[lastIndex] && combined[lastIndex].priority === "not-last") {
+      // try to swap with earlier non-not-last
+      let swapIndex = -1;
+      for (let i = lastIndex - 1; i >= 0; i--) {
+        if (combined[i].priority !== "not-last") {
+          swapIndex = i;
+          break;
+        }
+      }
+      if (swapIndex !== -1) {
+        const tmp = combined[swapIndex];
+        combined[swapIndex] = combined[lastIndex];
+        combined[lastIndex] = tmp;
+      } else {
+        throw new Error("Constraint violation: all instructions are 'not-last', cannot place one at end.");
+      }
+    }
+  
+    // Validation
+    function validate(seq) {
+      const len = seq.length;
+      if (len === 0) throw new Error("Empty instruction sequence!");
+  
+      seq.forEach((instr, idx) => {
+        if (instr.priority === "last" && idx !== len - 1)
+          throw new Error("Constraint violation: 'last' not in last position");
+        if (instr.priority === "second-last" && idx !== len - 2)
+          throw new Error("Constraint violation: 'second-last' not in second-last position");
+        if (instr.priority === "third-last" && idx !== len - 3)
+          throw new Error("Constraint violation: 'third-last' not in third-last position");
+        if (instr.priority === "not-last" && idx === len - 1)
+          throw new Error("Constraint violation: 'not-last' placed last");
+      });
+    }
+  
+    validate(combined);
+  
+    return combined;
   }
 
   const setupActions = calculateSetupActions(targetValue, instructions);
