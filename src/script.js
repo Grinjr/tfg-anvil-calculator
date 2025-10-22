@@ -174,24 +174,25 @@ document.getElementById("calculate-button").addEventListener("click", function()
     let preTargetValue = targetValue - instructionSum;
     if (preTargetValue === 0) return [];
   
-    // BFS with shortest-path tracking
+    // --- BFS First ---
     const queue = [[0, []]]; // [currentValue, path]
     const visited = new Map(); // value => shortest path length
     visited.set(0, 0);
+    const MAX_BFS_STEPS = 15;
   
     while (queue.length > 0) {
       const [currentValue, path] = queue.shift();
   
       if (currentValue === preTargetValue) return path;
+      if (path.length >= MAX_BFS_STEPS) continue;
   
-      // Sort actions so that we try moves that get closer to the target first
+      // Try moves that get closer first
       const sortedActions = Object.entries(actions)
         .sort(([, value]) => Math.abs(preTargetValue - (currentValue + value)));
   
       for (let [action, value] of sortedActions) {
         const nextValue = currentValue + value;
   
-        // Only proceed if we haven't reached this value with fewer or equal steps
         if (!visited.has(nextValue) || visited.get(nextValue) > path.length + 1) {
           visited.set(nextValue, path.length + 1);
           queue.push([nextValue, [...path, action]]);
@@ -199,8 +200,31 @@ document.getElementById("calculate-button").addEventListener("click", function()
       }
     }
   
-    // This should never happen
-    return [];
+    // --- BFS failed, fallback to greedy ---
+    let greedyValue = 0;
+    const greedyPath = [];
+    const MAX_GREEDY_STEPS = 20;
+  
+    for (let i = 0; i < MAX_GREEDY_STEPS && greedyValue !== preTargetValue; i++) {
+      let bestAction = null;
+      let bestDistance = Math.abs(preTargetValue - greedyValue);
+  
+      for (let action in actions) {
+        const nextValue = greedyValue + actions[action];
+        const distance = Math.abs(preTargetValue - nextValue);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestAction = action;
+        }
+      }
+  
+      if (!bestAction) break; // no improvement possible
+  
+      greedyValue += actions[bestAction];
+      greedyPath.push(bestAction);
+    }
+  
+    return greedyPath;
   }
 
   function sortInstructions(instructions) {
