@@ -176,75 +176,56 @@ document.getElementById("calculate-button").addEventListener("click", function()
       return [];
     }
     
-    // Determine if we need positive or negative actions
-    if (preTargetValue > 0) {
-      // Use standard DP for positive values
-      const dp = Array(preTargetValue + 1).fill(Infinity);
-      dp[0] = 0;
-  
-      for (let i = 0; i <= preTargetValue; i++) {
-        if (dp[i] !== Infinity) {
-          for (let action in actions) {
-            let nextValue = i + actions[action];
-            if (nextValue >= 0 && nextValue <= preTargetValue) {
-              dp[nextValue] = Math.min(dp[nextValue], dp[i] + 1);
-            }
+    // Use Map-based DP that works for both positive and negative targets
+    const dp = new Map();
+    const parent = new Map();
+    dp.set(0, 0);
+    
+    // Use level-by-level BFS with reasonable limits
+    let currentLevel = [0];
+    let visited = new Set([0]);
+    const maxSteps = 30; // Maximum number of actions to try
+    
+    // Calculate reasonable bounds for exploration
+    const minBound = Math.min(preTargetValue - 50, -50);
+    const maxBound = Math.max(preTargetValue + 50, 50);
+    
+    for (let step = 0; step < maxSteps; step++) {
+      const nextLevel = [];
+      
+      for (const current of currentLevel) {
+        if (current === preTargetValue) {
+          // Found it! Reconstruct path
+          const path = [];
+          let node = preTargetValue;
+          while (node !== 0) {
+            const [prevNode, action] = parent.get(node);
+            path.push(action);
+            node = prevNode;
           }
+          return path.reverse();
         }
-      }
-  
-      let setupActions = [];
-      let currentValue = preTargetValue;
-  
-      while (currentValue > 0) {
+        
+        // Try all actions
         for (let action in actions) {
-          let prevValue = currentValue - actions[action];
-          if (prevValue >= 0 && dp[prevValue] === dp[currentValue] - 1) {
-            setupActions.push(action);
-            currentValue = prevValue;
-            break;
+          const nextValue = current + actions[action];
+          
+          // Only explore values within reasonable range
+          if (nextValue >= minBound && nextValue <= maxBound && !visited.has(nextValue)) {
+            visited.add(nextValue);
+            dp.set(nextValue, step + 1);
+            parent.set(nextValue, [current, action]);
+            nextLevel.push(nextValue);
           }
         }
       }
-  
-      setupActions.reverse();
-      return setupActions;
-    } else {
-      // For negative values, use DP with offset
-      const absTarget = Math.abs(preTargetValue);
-      const maxRange = absTarget + 50; // Small buffer
-      const offset = maxRange;
-      const dp = Array(2 * maxRange + 1).fill(Infinity);
-      dp[offset] = 0; // 0 is at position offset
-  
-      for (let i = 0; i < dp.length; i++) {
-        if (dp[i] !== Infinity) {
-          for (let action in actions) {
-            let nextIndex = i + actions[action];
-            if (nextIndex >= 0 && nextIndex < dp.length) {
-              dp[nextIndex] = Math.min(dp[nextIndex], dp[i] + 1);
-            }
-          }
-        }
-      }
-  
-      let setupActions = [];
-      let currentIndex = offset + preTargetValue;
-  
-      while (currentIndex !== offset) {
-        for (let action in actions) {
-          let prevIndex = currentIndex - actions[action];
-          if (prevIndex >= 0 && prevIndex < dp.length && dp[prevIndex] === dp[currentIndex] - 1) {
-            setupActions.push(action);
-            currentIndex = prevIndex;
-            break;
-          }
-        }
-      }
-  
-      setupActions.reverse();
-      return setupActions;
+      
+      currentLevel = nextLevel;
+      if (currentLevel.length === 0) break;
     }
+    
+    // Fallback if not found
+    return [];
   }
 
   function sortInstructions(instructions) {
