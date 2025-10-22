@@ -286,10 +286,9 @@ document.getElementById("calculate-button").addEventListener("click", function()
     const notLast = instructions.filter(i => i.priority === "not-last");
     const anyPriority = instructions.filter(i => i.priority === "any");
   
-    // Build base sequence (flexible instructions first)
+    // Build sequence: flexible first, then finals in strict order
     let combined = [...anyPriority, ...notLast];
   
-    // Now add fixed slots in strict order
     const finals = [];
     if (thirdLast) finals.push(thirdLast);
     if (secondLast) finals.push(secondLast);
@@ -297,46 +296,33 @@ document.getElementById("calculate-button").addEventListener("click", function()
   
     combined = [...combined, ...finals];
   
-    // --- Validation ---
+    // --- Validation (with conditional debug logging) ---
     const len = combined.length;
     if (len === 0) throw new Error("Empty instruction sequence!");
   
+    function logAndThrow(msg) {
+      console.group("sortInstructions Constraint Violation");
+      console.log("Error:", msg);
+      console.log("Input instructions:", instructions.map(i => `${i.action} (${i.priority})`));
+      console.log("Combined result:", combined.map(i => `${i.action} (${i.priority})`));
+      console.groupEnd();
+      throw new Error(msg);
+    }
+  
     if (last && combined[len - 1] !== last)
-      throw new Error("Constraint violation: 'last' not in last position");
+      logAndThrow("'last' not in last position");
   
-    if (secondLast && combined[len - 2] !== secondLast)
-      throw new Error("Constraint violation: 'second-last' not in second-last position");
+    if (secondLast && len >= 2 && combined[len - 2] !== secondLast)
+      logAndThrow("'second-last' not in second-last position");
   
-    if (thirdLast && combined[len - 3] !== thirdLast)
-      throw new Error("Constraint violation: 'third-last' not in third-last position");
+    if (thirdLast && len >= 3 && combined[len - 3] !== thirdLast)
+      logAndThrow("'third-last' not in third-last position");
   
     if (combined[len - 1]?.priority === "not-last")
-      throw new Error("Constraint violation: 'not-last' placed last");
+      logAndThrow("'not-last' placed last");
   
     return combined;
   }
-
-  const setupActions = calculateSetupActions(targetValue, instructions);
-  const sortedInstructions = sortInstructions(instructions);
-
-  // Display results as images
-  const setupContainer = document.getElementById("setup-actions");
-  const finalContainer = document.getElementById("final-actions");
-
-  // Clear previous results
-  setupContainer.innerHTML = "";
-  finalContainer.innerHTML = "";
-
-  // Group and append setup actions
-  displayGroupedActions(setupContainer, setupActions);
-
-  // Group and append final instructions
-  displayGroupedActions(finalContainer, sortedInstructions);
-
-  // Show the result card with a transition
-  const resultCard = document.getElementById("result");
-  resultCard.classList.add("visible");
-});
 
 // Single function to manage icon selection
 function setupInstructionListener(selector) {
