@@ -186,7 +186,7 @@ document.getElementById("calculate-button").addEventListener("click", function()
       if (currentValue === preTargetValue) return path;
       if (path.length >= MAX_BFS_STEPS) continue;
   
-      // Try moves that get closer first
+      // Try all actions, moving closer to target
       const sortedActions = Object.entries(actions)
         .sort(([, value]) => Math.abs(preTargetValue - (currentValue + value)));
   
@@ -226,31 +226,29 @@ document.getElementById("calculate-button").addEventListener("click", function()
   
     return greedyPath;
   }
-
+  
   function sortInstructions(instructions) {
     const last = instructions.filter(i => i.priority === 'last');
     const secondLast = instructions.filter(i => i.priority === 'second-last');
     const thirdLast = instructions.filter(i => i.priority === 'third-last');
     const notLast = instructions.filter(i => i.priority === 'not-last');
     const anyPriority = instructions.filter(i => i.priority === 'any');
-
-    let sortedInstructions = [...thirdLast, ...secondLast, ...notLast, ...last];
-
+  
+    // Start with fixed positions at the end
+    let sortedInstructions = [...thirdLast, ...secondLast, ...last];
+  
+    // Insert 'any' instructions somewhere before the very last instruction
     if (anyPriority.length > 0) {
-      const anyHits = anyPriority.map(i => i);
-
-      let insertionPoint = 0;
-      if (last.length > 0 && secondLast.length > 0) {
-        insertionPoint = sortedInstructions.length - last.length - secondLast.length;
-      } else if (last.length > 0) {
-        insertionPoint = sortedInstructions.length - last.length;
-      } else {
-        insertionPoint = sortedInstructions.length;
-      }
-
-      sortedInstructions.splice(insertionPoint, 0, ...anyHits);
+      const insertionPoint = sortedInstructions.length > 0 ? sortedInstructions.length - 1 : 0;
+      sortedInstructions.splice(insertionPoint, 0, ...anyPriority);
     }
-
+  
+    // Insert 'not-last' instructions anywhere except last
+    if (notLast.length > 0) {
+      const safeInsertionPoint = sortedInstructions.length > 0 ? sortedInstructions.length - 1 : 0;
+      sortedInstructions.splice(safeInsertionPoint, 0, ...notLast);
+    }
+  
     return sortedInstructions;
   }
 
