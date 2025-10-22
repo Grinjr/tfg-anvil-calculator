@@ -279,53 +279,100 @@ document.getElementById("calculate-button").addEventListener("click", function()
   }
   
   function sortInstructions(instructions) {
+    // Find fixed-position instructions (at most one each)
     const last = instructions.find(i => i.priority === "last");
     const secondLast = instructions.find(i => i.priority === "second-last");
     const thirdLast = instructions.find(i => i.priority === "third-last");
-  
-    const notLast = instructions.filter(i => i.priority === "not-last");
-    const anyPriority = instructions.filter(i => i.priority === "any");
-  
-    // Build sequence: flexible first, then finals in strict order
-    let combined = [...anyPriority, ...notLast];
-  
-    const finals = [];
-    if (thirdLast) finals.push(thirdLast);
-    if (secondLast) finals.push(secondLast);
-    if (last) finals.push(last);
-  
-    combined = [...combined, ...finals];
-  
-    // --- Validation (with conditional debug logging) ---
-    const len = combined.length;
+
+    // Flexible pools
+    const flexAny = instructions.filter(i => i.priority === "any").slice();
+    const flexNotLast = instructions.filter(i => i.priority === "not-last").slice();
+
+    // Helper to take one item from an array (FIFO)
+    const take = (arr) => arr.length ? arr.shift() : null;
+
+    // Build the 3-slot tail [third-last, second-last, last]
+    const tail = [null, null, null];
+    if (thirdLast)  tail[0] = thirdLast;
+    if (secondLast) tail[1] = secondLast;
+    if (last)       tail[2] = last;
+
+    // Fill LAST slot (index 2) if empty:
+    // - Can use 'any'
+    // - Must NOT use 'not-last'
+    if (!tail[2]) {
+      const fromAny = take(flexAny);
+      if (fromAny) {
+        tail[2] = fromAny;
+      } else {
+        // No legal candidate for last; constraints unsatisfiable with provided instructions
+        // (keep going so validator can show a clear error later)
+        console.warn("sortInstructions: No legal instruction available for 'last' slot (cannot use 'not-last').");
+      }
+    }
+
+    // Fill SECOND-LAST slot (index 1) if empty:
+    // - Can use 'any' or 'not-last'
+    if (!tail[1]) {
+      const candidate = take(flexAny) || take(flexNotLast);
+      if (candidate) tail[1] = candidate;
+    }
+
+    // Fill THIRD-LAST slot (index 0) if empty:
+    // - Can use 'any' or 'not-last'
+    if (!tail[0]) {
+      const candidate = take(flexAny) || take(flexNotLast);
+      if (candidate) tail[0] = candidate;
+    }
+
+    // Whatever flexible instructions remain go BEFORE the tail
+    const head = [...flexAny, ...flexNotLast];
+
+    // Return final instruction objects in order: head + tail (filter nulls just in case)
+    return [...head, ...tail.filter(Boolean)];
+  }
+
+  function validateRecipe(fullSeq) {
+    const len = fullSeq.length;
     if (len === 0) throw new Error("Empty instruction sequence!");
-  
+
     function logAndThrow(msg) {
-      console.group("sortInstructions Constraint Violation");
+      console.group("Recipe Constraint Violation");
       console.log("Error:", msg);
-      console.log("Input instructions:", instructions.map(i => `${i.action} (${i.priority})`));
-      console.log("Combined result:", combined.map(i => `${i.action} (${i.priority})`));
+      console.log("Full recipe:", fullSeq.map(i =>
+        typeof i === "string"
+          ? `${i} (setup)`
+          : `${i.action} (${i.priority})`
+      ));
       console.groupEnd();
       throw new Error(msg);
     }
-  
-    if (last && combined[len - 1] !== last)
-      logAndThrow("'last' not in last position");
-  
-    if (secondLast && len >= 2 && combined[len - 2] !== secondLast)
-      logAndThrow("'second-last' not in second-last position");
-  
-    if (thirdLast && len >= 3 && combined[len - 3] !== thirdLast)
-      logAndThrow("'third-last' not in third-last position");
-  
-    if (combined[len - 1]?.priority === "not-last")
-      logAndThrow("'not-last' placed last");
-  
-    return combined;
+
+    fullSeq.forEach((item, idx) => {
+      if (typeof item === "string") return; // setup step, skip
+      switch (item.priority) {
+        case "last":
+          if (idx !== len - 1) logAndThrow("'last' not in last position");
+          break;
+        case "second-last":
+          if (len >= 2 && idx !== len - 2) logAndThrow("'second-last' not in second-last position");
+          break;
+        case "third-last":
+          if (len >= 3 && idx !== len - 3) logAndThrow("'third-last' not in third-last position");
+          break;
+        case "not-last":
+          if (idx === len - 1) logAndThrow("'not-last' placed last");
+          break;
+      }
+    });
   }
+
 
   const setupActions = calculateSetupActions(targetValue, instructions);
   const sortedInstructions = sortInstructions(instructions);
+
+  const fullRecipe = [...setupActions, ...sortedInstructions];
+  validateRecipe(fullRecipe);
 
   // Display results as images
   const setupContainer = document.getElementById("setup-actions");
