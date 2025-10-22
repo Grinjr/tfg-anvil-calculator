@@ -158,9 +158,11 @@ document.getElementById("calculate-button").addEventListener("click", function()
 
 
   function calculateSetupActions(targetValue, instructions) {
+    // First, apply the instructions that already have actions
     let instructionSum = 0;
     instructions.forEach(instr => {
       if (instr.action === "hit") {
+        // Pick best hit for the current remaining target
         const bestHit = selectBestHit(targetValue - instructionSum, ["hit1", "hit2", "hit3"]);
         instructionSum += actions[bestHit];
         instr.action = bestHit;
@@ -172,29 +174,32 @@ document.getElementById("calculate-button").addEventListener("click", function()
     let preTargetValue = targetValue - instructionSum;
     if (preTargetValue === 0) return [];
   
-    const queue = [[0, []]]; // [currentValue, actionsPath]
-    const visited = new Set([0]);
-    
+    // BFS with shortest-path tracking
+    const queue = [[0, []]]; // [currentValue, path]
+    const visited = new Map(); // value => shortest path length
+    visited.set(0, 0);
+  
     while (queue.length > 0) {
       const [currentValue, path] = queue.shift();
-    
+  
       if (currentValue === preTargetValue) return path;
-    
-      // Sort actions by how close they get to the target
+  
+      // Sort actions so that we try moves that get closer to the target first
       const sortedActions = Object.entries(actions)
         .sort(([, value]) => Math.abs(preTargetValue - (currentValue + value)));
-    
+  
       for (let [action, value] of sortedActions) {
         const nextValue = currentValue + value;
-    
-        if (!visited.has(nextValue)) {
-          visited.add(nextValue);
+  
+        // Only proceed if we haven't reached this value with fewer or equal steps
+        if (!visited.has(nextValue) || visited.get(nextValue) > path.length + 1) {
+          visited.set(nextValue, path.length + 1);
           queue.push([nextValue, [...path, action]]);
         }
       }
     }
   
-    // If BFS fails (should never happen), return empty array instead of null
+    // This should never happen
     return [];
   }
 
