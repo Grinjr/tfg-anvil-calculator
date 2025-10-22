@@ -174,6 +174,8 @@ document.getElementById("calculate-button").addEventListener("click", function()
     let preTargetValue = targetValue - instructionSum;
     if (preTargetValue === 0) return [];
   
+    const isNegativeTarget = preTargetValue < 0;
+  
     // --- BFS First ---
     const queue = [[0, []]]; // [currentValue, path]
     const visited = new Map(); // value => shortest path length
@@ -186,12 +188,16 @@ document.getElementById("calculate-button").addEventListener("click", function()
       if (currentValue === preTargetValue) return path;
       if (path.length >= MAX_BFS_STEPS) continue;
   
-      // Try all actions, moving closer to target
       const sortedActions = Object.entries(actions)
         .sort(([, value]) => Math.abs(preTargetValue - (currentValue + value)));
   
       for (let [action, value] of sortedActions) {
         const nextValue = currentValue + value;
+  
+        // Skip actions that move the wrong direction
+        if ((isNegativeTarget && nextValue > preTargetValue) || (!isNegativeTarget && nextValue < preTargetValue)) {
+          continue;
+        }
   
         if (!visited.has(nextValue) || visited.get(nextValue) > path.length + 1) {
           visited.set(nextValue, path.length + 1);
@@ -212,6 +218,12 @@ document.getElementById("calculate-button").addEventListener("click", function()
       for (let action in actions) {
         const nextValue = greedyValue + actions[action];
         const distance = Math.abs(preTargetValue - nextValue);
+  
+        // Skip moves that push the wrong way
+        if ((isNegativeTarget && nextValue > preTargetValue) || (!isNegativeTarget && nextValue < preTargetValue)) {
+          continue;
+        }
+  
         if (distance < bestDistance) {
           bestDistance = distance;
           bestAction = action;
@@ -234,22 +246,14 @@ document.getElementById("calculate-button").addEventListener("click", function()
     const notLast = instructions.filter(i => i.priority === 'not-last');
     const anyPriority = instructions.filter(i => i.priority === 'any');
   
-    // Start with fixed positions at the end
-    let sortedInstructions = [...thirdLast, ...secondLast, ...last];
+    // Final steps are fixed positions at the end
+    const finalInstructions = [...thirdLast, ...secondLast, ...last];
   
-    // Insert 'any' instructions somewhere before the very last instruction
-    if (anyPriority.length > 0) {
-      const insertionPoint = sortedInstructions.length > 0 ? sortedInstructions.length - 1 : 0;
-      sortedInstructions.splice(insertionPoint, 0, ...anyPriority);
-    }
+    // Any and not-last can appear before the final sequence (setup steps)
+    const setupInstructions = [...anyPriority, ...notLast];
   
-    // Insert 'not-last' instructions anywhere except last
-    if (notLast.length > 0) {
-      const safeInsertionPoint = sortedInstructions.length > 0 ? sortedInstructions.length - 1 : 0;
-      sortedInstructions.splice(safeInsertionPoint, 0, ...notLast);
-    }
-  
-    return sortedInstructions;
+    // Combine setup first, final at the end
+    return [...setupInstructions, ...finalInstructions];
   }
 
   const setupActions = calculateSetupActions(targetValue, instructions);
