@@ -176,27 +176,48 @@ document.getElementById("calculate-button").addEventListener("click", function()
       return [];
     }
     
-    // Use BFS to find optimal path for both positive and negative values
-    const queue = [[0, []]]; // [currentValue, actionsPath]
-    const visited = new Set([0]);
+    // For negative values, we need to use negative actions (hits)
+    // For positive values, we need to use positive actions (punch, bend, etc.)
+    // Create a DP table that works with both positive and negative indices
     
-    while (queue.length > 0) {
-      const [currentValue, path] = queue.shift();
+    const offset = 10000; // Offset to handle negative indices
+    const maxRange = 20000; // Total range
+    const dp = new Map(); // Use Map for sparse storage
+    const parent = new Map(); // Track the path
+    
+    dp.set(0, 0); // distance from 0 to 0 is 0
+    
+    const queue = [0];
+    let front = 0;
+    
+    while (front < queue.length) {
+      const current = queue[front++];
+      const currentDist = dp.get(current);
       
-      // Check if we've reached the target
-      if (currentValue === preTargetValue) {
-        return path;
+      if (current === preTargetValue) {
+        // Reconstruct path
+        const path = [];
+        let node = preTargetValue;
+        while (node !== 0) {
+          const [prevNode, action] = parent.get(node);
+          path.push(action);
+          node = prevNode;
+        }
+        return path.reverse();
       }
       
-      // Try all possible actions
+      // Try all actions
       for (let action in actions) {
-        const nextValue = currentValue + actions[action];
+        const nextValue = current + actions[action];
         
-        // Bound the search space to prevent infinite loops
-        const maxSearch = Math.max(Math.abs(preTargetValue) * 2, 100);
-        if (!visited.has(nextValue) && Math.abs(nextValue) <= maxSearch) {
-          visited.add(nextValue);
-          queue.push([nextValue, [...path, action]]);
+        // Bound check: don't go too far from our target
+        const maxBound = Math.max(Math.abs(preTargetValue), 100) + 50;
+        if (Math.abs(nextValue) > maxBound) continue;
+        
+        if (!dp.has(nextValue)) {
+          dp.set(nextValue, currentDist + 1);
+          parent.set(nextValue, [current, action]);
+          queue.push(nextValue);
         }
       }
     }
