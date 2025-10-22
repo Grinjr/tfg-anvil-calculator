@@ -174,15 +174,19 @@ document.getElementById("calculate-button").addEventListener("click", function()
   
     const queue = [[0, []]]; // [currentValue, actionsPath]
     const visited = new Set([0]);
-  
+    
     while (queue.length > 0) {
       const [currentValue, path] = queue.shift();
-  
+    
       if (currentValue === preTargetValue) return path;
-  
-      for (let action in actions) {
-        const nextValue = currentValue + actions[action];
-  
+    
+      // Sort actions by how close they get to the target
+      const sortedActions = Object.entries(actions)
+        .sort(([, value]) => Math.abs(preTargetValue - (currentValue + value)));
+    
+      for (let [action, value] of sortedActions) {
+        const nextValue = currentValue + value;
+    
         if (!visited.has(nextValue)) {
           visited.add(nextValue);
           queue.push([nextValue, [...path, action]]);
