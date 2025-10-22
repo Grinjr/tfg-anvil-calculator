@@ -130,30 +130,30 @@ document.getElementById("calculate-button").addEventListener("click", function()
   }
 
   function displayGroupedActions(container, actions) {
-    // Group identical actions
-    const grouped = actions.reduce((acc, action) => {
-      const key = typeof action === "string" ? action : action.action;
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-  
-    // Render grouped actions
-    Object.entries(grouped).forEach(([action, count]) => {
+    let i = 0;
+    while (i < actions.length) {
+      const current = typeof actions[i] === "string" ? actions[i] : actions[i].action;
+      let count = 1;
+      while (i + count < actions.length &&
+             (typeof actions[i + count] === "string" ? actions[i + count] : actions[i + count].action) === current) {
+        count++;
+      }
+
       const wrapper = document.createElement("div");
       wrapper.classList.add("action-with-count");
-  
-      const img = createActionImage(action);
+      const img = createActionImage(current);
       wrapper.appendChild(img);
-  
+
       if (count > 1) {
         const countText = document.createElement("div");
         countText.classList.add("action-count");
         countText.textContent = `×${count}`;
         wrapper.appendChild(countText);
       }
-  
+
       container.appendChild(wrapper);
-    });
+      i += count;
+    }
   }
 
 
@@ -170,35 +170,26 @@ document.getElementById("calculate-button").addEventListener("click", function()
     });
 
     let preTargetValue = targetValue - instructionSum;
-    const dp = Array(preTargetValue + 1).fill(Infinity);
-    dp[0] = 0;
 
-    for (let i = 0; i <= preTargetValue; i++) {
-      if (dp[i] !== Infinity) {
-        for (let action in actions) {
-          let nextValue = i + actions[action];
-          if (nextValue <= preTargetValue) {
-            dp[nextValue] = Math.min(dp[nextValue], dp[i] + 1);
-          }
-        }
-      }
-    }
-
-    let setupActions = [];
+    const setupActions = [];
     let currentValue = preTargetValue;
 
-    while (currentValue > 0) {
+    // Determine which action to use to reach the target (can be negative or positive)
+    while (currentValue !== 0) {
+      let bestAction = null;
+      let minDiff = Infinity;
+
       for (let action in actions) {
-        let prevValue = currentValue - actions[action];
-        if (prevValue >= 0 && dp[prevValue] === dp[currentValue] - 1) {
-          setupActions.push(action);
-          currentValue = prevValue;
-          break;
+        let nextValue = currentValue - actions[action];
+        if (Math.abs(nextValue) < minDiff) {
+          minDiff = Math.abs(nextValue);
+          bestAction = action;
         }
       }
-    }
 
-    setupActions.reverse();
+      setupActions.push(bestAction);
+      currentValue -= actions[bestAction];
+    }
 
     return setupActions;
   }
@@ -348,6 +339,5 @@ window.addEventListener('load', resetPage);
 setupInstructionListener('.instruction-set-1');
 setupInstructionListener('.instruction-set-2');
 setupInstructionListener('.instruction-set-3');
-
 
 
