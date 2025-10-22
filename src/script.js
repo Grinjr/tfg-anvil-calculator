@@ -323,7 +323,7 @@ document.getElementById("calculate-button").addEventListener("click", function()
   
     return combined;
   }
-
+});
 // Single function to manage icon selection
 function setupInstructionListener(selector) {
   const icon = document.querySelector(selector + ' .action-icon');
@@ -420,4 +420,3 @@ window.addEventListener('load', resetPage);
 setupInstructionListener('.instruction-set-1');
 setupInstructionListener('.instruction-set-2');
 setupInstructionListener('.instruction-set-3');
-
