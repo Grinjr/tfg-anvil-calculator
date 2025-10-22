@@ -158,106 +158,164 @@ document.getElementById("calculate-button").addEventListener("click", function()
 
 
   function calculateSetupActions(targetValue, instructions) {
-    // First, resolve "hit" placeholders
-    let instructionSum = 0;
+    // --- helpers ---
+  
+    // BFS to find a short path to "goal" using ALL actions.
+    // Returns an array of action names (possibly empty if goal==0).
+    function findShortestPathTo(goal) {
+      if (goal === 0) return [];
+      const MAX_STEPS = 14; // small but enough for these magnitudes
+      const start = 0;
+      const q = [[start, []]];
+      const seen = new Set([start]);
+  
+      while (q.length) {
+        const [cur, path] = q.shift();
+        if (cur === goal) return path;
+  
+        if (path.length >= MAX_STEPS) continue;
+  
+        // Try actions that move us closer first
+        const candidates = Object.entries(actions)
+          .map(([a, v]) => ({ a, v, score: Math.abs(goal - (cur + v)) }))
+          .sort((x, y) => x.score - y.score);
+  
+        for (const { a, v } of candidates) {
+          const nxt = cur + v;
+          if (!seen.has(nxt)) {
+            seen.add(nxt);
+            q.push([nxt, [...path, a]]);
+          }
+        }
+      }
+      // If we didn’t find exact, fall back to a greedy-ish approximate build
+      // (but still return something non-empty and useful)
+      let approx = [];
+      let cur = 0;
+      const LIMIT = 40;
+      for (let i = 0; i < LIMIT && cur !== goal; i++) {
+        let best = null, bestDist = Math.abs(goal - cur);
+        for (const [a, v] of Object.entries(actions)) {
+          const dist = Math.abs(goal - (cur + v));
+          if (dist < bestDist) { bestDist = dist; best = a; }
+        }
+        if (!best) break;
+        approx.push(best);
+        cur += actions[best];
+      }
+      return approx.length ? approx : ["punch"]; // guaranteed non-empty
+    }
+  
+    // Jointly assign final hit placeholders (third-last, second-last, last)
+    // to hit1/hit2/hit3 to minimize setup path length for the remainder.
+    function assignFinalHitsSmart() {
+      // Identify the final-slot instructions in order third-last -> second-last -> last
+      const finals = [];
+      const third = instructions.filter(x => x.priority === "third-last");
+      const second = instructions.filter(x => x.priority === "second-last");
+      const last = instructions.filter(x => x.priority === "last");
+      finals.push(...third, ...second, ...last);
+  
+      // If none of the finals are generic "hit", nothing to do here.
+      const finalsAreFlexible = finals.some(f => f.action === "hit");
+      if (!finalsAreFlexible) return;
+  
+      // Precompute sum of all NON-final instructions (they’re fixed already)
+      const nonFinals = instructions.filter(x => !finals.includes(x));
+      const nonFinalSum = nonFinals.reduce((s, i) => s + actions[i.action], 0);
+  
+      // For finals, some might already be specific hit1/2/3 — keep those fixed
+      // For those that are "hit", try all three choices.
+      const optionsPerSlot = finals.map(f => {
+        if (f.action === "hit") return ["hit1", "hit2", "hit3"];
+        // If already a specific hit or a non-hit, keep it fixed
+        return [f.action];
+      });
+  
+      // Generate all combinations (cartesian product)
+      function* cartesian(arrays, idx = 0, cur = []) {
+        if (idx === arrays.length) { yield cur; return; }
+        for (const opt of arrays[idx]) {
+          yield* cartesian(arrays, idx + 1, [...cur, opt]);
+        }
+      }
+  
+      let best = { setupLen: Infinity, assign: null, setupPath: null };
+  
+      for (const assignment of cartesian(optionsPerSlot)) {
+        // If any assigned item isn’t one of the allowed actions, skip
+        if (!assignment.every(a => actions.hasOwnProperty(a))) continue;
+  
+        const finalsSum = assignment.reduce((s, a) => s + actions[a], 0);
+        const remainder = targetValue - nonFinalSum - finalsSum;
+  
+        const setupPath = findShortestPathTo(remainder);
+        const setupLen = setupPath.length;
+  
+        if (setupLen < best.setupLen) {
+          best = { setupLen, assign: assignment, setupPath };
+          if (setupLen === 0) break; // can’t do better
+        }
+      }
+  
+      // Apply the best assignment back into the finals
+      if (best.assign) {
+        for (let i = 0; i < finals.length; i++) {
+          finals[i].action = best.assign[i];
+        }
+        // Return the setup path we already computed so we don’t recompute.
+        return best.setupPath || [];
+      }
+  
+      // Fallback: if somehow no assignment found (shouldn’t happen), leave as-is.
+      return null;
+    }
+  
+    // --- MAIN FUNCTION ---
+  
+    // 1) Resolve any non-final "hit" placeholders greedily for direction.
+    //    We’ll let assignFinalHitsSmart() handle the final three positions.
+    //    So for non-finals only:
     instructions.forEach(instr => {
+      if (instr.priority === "last" || instr.priority === "second-last" || instr.priority === "third-last") {
+        // leave these for joint optimization
+        return;
+      }
       if (instr.action === "hit") {
-        const remaining = targetValue - instructionSum;
-        const bestHit = selectBestHit(remaining, ["hit1", "hit2", "hit3"]);
-        instr.action = bestHit || "hit1";
-        instructionSum += actions[instr.action];
-      } else {
-        instructionSum += actions[instr.action];
+        // choose a hit that nudges toward target quickly
+        // (use the sign of the remaining)
+        const remaining = targetValue; // rough nudge; finals will optimize precisely
+        // prefer the hit with largest magnitude in the right direction
+        const choices = ["hit1", "hit2", "hit3"];
+        const pick = choices.reduce((best, a) => {
+          const v = actions[a];
+          const score = Math.abs(remaining - v);
+          if (!best || score < best.score) return { a, score };
+          return best;
+        }, null);
+        instr.action = pick ? pick.a : "hit1";
       }
     });
   
-    let preTargetValue = targetValue - instructionSum;
-    if (preTargetValue === 0) return [];
+    // 2) Jointly assign the final hit placeholders to minimize setup length
+    const precomputedSetup = assignFinalHitsSmart();
   
-    const isNegative = preTargetValue < 0;
+    // 3) With all instructions now concrete, compute the remaining needed amount
+    const instructionSum = instructions.reduce((s, i) => s + actions[i.action], 0);
+    const preTargetValue = targetValue - instructionSum;
   
-    // --- BFS exact search ---
-    const MAX_BFS_STEPS = 18;
-    const queue = [[0, []]];
-    const visited = new Map();
-    visited.set(0, 0);
-  
-    while (queue.length) {
-      const [cur, path] = queue.shift();
-      if (cur === preTargetValue) return path;
-  
-      if (path.length >= MAX_BFS_STEPS) continue;
-  
-      const candidates = Object.entries(actions)
-        .map(([a, v]) => ({ action: a, value: v, score: Math.abs(preTargetValue - (cur + v)) }))
-        .sort((x, y) => x.score - y.score);
-  
-      for (let { action, value } of candidates) {
-        const next = cur + value;
-        if (!visited.has(next) || visited.get(next) > path.length + 1) {
-          visited.set(next, path.length + 1);
-          queue.push([next, [...path, action]]);
-        }
-      }
+    // If our joint assignment already produced an optimal setup path, use it,
+    // otherwise, compute one for the remaining remainder (if any).
+    if (precomputedSetup && precomputedSetup.length >= 0) {
+      // If remainder already zero after instructionSum, we’re done
+      if (preTargetValue === 0) return precomputedSetup;
+      // Else we still need to cover a delta (can happen if non-final hits were nudged earlier)
+      const tail = findShortestPathTo(preTargetValue);
+      return [...precomputedSetup, ...tail];
+    } else {
+      if (preTargetValue === 0) return [];
+      return findShortestPathTo(preTargetValue);
     }
-  
-    // --- Greedy heuristic ---
-    const MAX_GREEDY_STEPS = 60;
-    let greedyValue = 0;
-    const greedyPath = [];
-  
-    for (let i = 0; i < MAX_GREEDY_STEPS && greedyValue !== preTargetValue; i++) {
-      let bestAction = null;
-      let bestDist = Math.abs(preTargetValue - greedyValue);
-  
-      for (let a in actions) {
-        const next = greedyValue + actions[a];
-        const dist = Math.abs(preTargetValue - next);
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestAction = a;
-        }
-      }
-  
-      if (!bestAction) break;
-      greedyPath.push(bestAction);
-      greedyValue += actions[bestAction];
-    }
-  
-    if (greedyValue === preTargetValue && greedyPath.length > 0) {
-      return greedyPath;
-    }
-  
-    // --- Constructive fallback (always produces something) ---
-    const constructed = [];
-    let curVal = 0;
-  
-    const actionList = Object.keys(actions).sort((a, b) => Math.abs(actions[b]) - Math.abs(actions[a]));
-    let attempts = 0;
-  
-    while (curVal !== preTargetValue && attempts < 100) {
-      let bestAction = null;
-      let bestDist = Math.abs(preTargetValue - curVal);
-      for (let a of actionList) {
-        const next = curVal + actions[a];
-        const dist = Math.abs(preTargetValue - next);
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestAction = a;
-        }
-      }
-      if (!bestAction) break;
-      constructed.push(bestAction);
-      curVal += actions[bestAction];
-      attempts++;
-    }
-  
-    if (constructed.length === 0) {
-      // fallback safety
-      constructed.push("punch");
-    }
-  
-    return constructed;
   }
   
   function sortInstructions(instructions) {
