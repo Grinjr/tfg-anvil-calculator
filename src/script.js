@@ -325,13 +325,13 @@ document.getElementById("calculate-button").addEventListener("click", function()
     function validate(seq) {
       const len = seq.length;
       if (len === 0) throw new Error("Empty instruction sequence!");
-  
+    
       seq.forEach((instr, idx) => {
         if (instr.priority === "last" && idx !== len - 1)
           throw new Error("Constraint violation: 'last' not in last position");
-        if (instr.priority === "second-last" && idx !== len - 2)
+        if (instr.priority === "second-last" && len >= 2 && idx !== len - 2)
           throw new Error("Constraint violation: 'second-last' not in second-last position");
-        if (instr.priority === "third-last" && idx !== len - 3)
+        if (instr.priority === "third-last" && len >= 3 && idx !== len - 3)
           throw new Error("Constraint violation: 'third-last' not in third-last position");
         if (instr.priority === "not-last" && idx === len - 1)
           throw new Error("Constraint violation: 'not-last' placed last");
