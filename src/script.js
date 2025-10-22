@@ -323,7 +323,29 @@ document.getElementById("calculate-button").addEventListener("click", function()
   
     return combined;
   }
+
+  const setupActions = calculateSetupActions(targetValue, instructions);
+  const sortedInstructions = sortInstructions(instructions);
+
+  // Display results as images
+  const setupContainer = document.getElementById("setup-actions");
+  const finalContainer = document.getElementById("final-actions");
+
+  // Clear previous results
+  setupContainer.innerHTML = "";
+  finalContainer.innerHTML = "";
+
+  // Group and append setup actions
+  displayGroupedActions(setupContainer, setupActions);
+
+  // Group and append final instructions
+  displayGroupedActions(finalContainer, sortedInstructions);
+
+  // Show the result card with a transition
+  const resultCard = document.getElementById("result");
+  resultCard.classList.add("visible");
 });
+
 // Single function to manage icon selection
 function setupInstructionListener(selector) {
   const icon = document.querySelector(selector + ' .action-icon');
